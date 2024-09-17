@@ -1,0 +1,13 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+body{
+  background-color: #090a19;
+  color:white;
+}
+.scrollable-container {
+  /* Hide horizontal scrollbar */
+  overflow-x: hidden;
+  /* Optional: ensure content does not overflow horizontally */
+  white-space: nowrap;
+}
