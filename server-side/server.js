@@ -15,7 +15,9 @@ require("./config/db");
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+    origin: "https://code-verse-sigma.vercel.app", // Update this to your frontend URL
+}));
 app.use(bodyParser.json());
 
 // Routes
