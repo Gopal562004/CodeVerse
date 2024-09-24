@@ -8,7 +8,7 @@ require("dotenv").config();
 // Import routes
 const userRoutes = require("./routes/userRoutes");
 const postRoutes = require("./routes/postRoutes");
-
+const likeRoutes = require("./routes/likeRoutes");
 // Import and initialize database connection
 require("./config/db");
 
@@ -19,7 +19,7 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // Routes
-
+app.use("/", likeRoutes);
 app.use("/user", userRoutes);
 app.use("/posts", postRoutes);
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));

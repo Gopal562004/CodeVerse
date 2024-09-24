@@ -92,7 +92,7 @@ const Home = () => {
       >
         <VStack spacing={8}>
           {shuffledPosts.map((post) => (
-            <PostCard key={post._id} post={post} />
+            <PostCard key={post._id} post={post}  />
           ))}
         </VStack>
         {isFetchingNextPage && <Spinner mt={4} />}

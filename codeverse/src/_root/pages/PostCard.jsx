@@ -2,22 +2,23 @@ import React, { useState, useEffect } from "react";
 import { FaHeart, FaComment, FaBookmark } from "react-icons/fa";
 import { Carousel } from "react-responsive-carousel";
 import "react-responsive-carousel/lib/styles/carousel.min.css";
-import { motion } from "framer-motion"; // Import for animations
+import axios from "axios";
+import { useAuth } from "../../context/AuthContext";
 
 const defaultProfilePhoto =
-  "http://localhost:5000/uploads/default-profile-photo.jpg"; // Replace with your default photo URL
+  "http://localhost:5000/uploads/default-profile-photo.jpg";
 
 const PostCard = ({ post }) => {
-  const [isExpanded, setIsExpanded] = useState(true); // Initially show small preview
+  const { user } = useAuth();
+  const [isExpanded, setIsExpanded] = useState(false);
   const [author, setAuthor] = useState(null);
-  const [showComments, setShowComments] = useState(false);
   const [liked, setLiked] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
+  const [likes, setLikes] = useState([]);
+  const [showLikesModal, setShowLikesModal] = useState(false);
+  const [visibleLikesCount, setVisibleLikesCount] = useState(3);
   const [newComment, setNewComment] = useState("");
-  const [comments, setComments] = useState([
-    { id: 1, username: "coder123", text: "Great post!" },
-    { id: 2, username: "dev_guru", text: "Very informative, thanks!" },
-  ]);
+  const [comments, setComments] = useState([]);
 
   useEffect(() => {
     const fetchAuthor = async () => {
@@ -37,31 +38,77 @@ const PostCard = ({ post }) => {
     fetchAuthor();
   }, [post.author]);
 
-  // Firebase Storage base URL
-  const firebaseStorageBaseURL =
-    "https://firebasestorage.googleapis.com/v0/b/codeverse-3a59b.appspot.com/o/";
+  useEffect(() => {
+    if (user && post.likedBy) {
+      setLiked(post.likedBy.includes(user.id));
+    }
+  }, [post.likedBy, user]);
 
-  // Check if post.media is an array and has at least one media item
-  const media = Array.isArray(post.media) ? post.media : [];
+  useEffect(() => {
+    const fetchLikes = async () => {
+      try {
+        const response = await axios.get(
+          `http://localhost:5000/posts/${post._id}/likes`
+        );
+        setLikeCount(response.data.likeCount);
+        setLikes(response.data.likes || []); // Ensure likes is always an array
+      } catch (error) {
+        console.error("Error fetching likes:", error);
+      }
+    };
 
-  // Filter media into images and videos
-  const images = media.filter((item) => item.type === "image");
-  const videos = media.filter((item) => item.type === "video");
+    fetchLikes();
+  }, [post._id]);
 
   const handleToggleExpand = () => {
     setIsExpanded(!isExpanded);
   };
 
-  const handleLike = () => {
-    setLiked(!liked);
+  const handleLikeToggle = async () => {
+    const postId = post._id;
+    const token = localStorage.getItem("token");
+
+    if (liked) {
+      try {
+        await axios.post(
+          `http://localhost:5000/posts/${postId}/unlike`,
+          {},
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setLiked(false);
+        setLikeCount((prevCount) => prevCount - 1);
+        setLikes((prevLikes) =>
+          prevLikes.filter((like) => like.user._id !== user.id)
+        );
+      } catch (error) {
+        console.error("Error unliking post:", error);
+      }
+    } else {
+      try {
+        await axios.post(
+          `http://localhost:5000/posts/${postId}/like`,
+          {},
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setLiked(true);
+        setLikeCount((prevCount) => prevCount + 1);
+        setLikes((prevLikes) => [...prevLikes, { user }]);
+      } catch (error) {
+        console.error("Error liking post:", error);
+      }
+    }
   };
 
-  const handleSave = () => {
-    setSaved(!saved);
+  const handleShowLikesModal = () => {
+    setShowLikesModal(true);
   };
 
-  const handleShowComments = () => {
-    setShowComments(!showComments);
+  const handleCloseLikesModal = () => {
+    setShowLikesModal(false);
+  };
+
+  const handleShowMoreLikes = () => {
+    setVisibleLikesCount((prevCount) => Math.min(prevCount + 3, likeCount));
   };
 
   const handleCommentChange = (event) => {
@@ -71,24 +118,20 @@ const PostCard = ({ post }) => {
   const handleCommentSubmit = (event) => {
     event.preventDefault();
     if (newComment.trim()) {
-      setComments([
-        ...comments,
-        { id: comments.length + 1, username: "You", text: newComment },
+      setComments((prevComments) => [
+        ...prevComments,
+        {
+          id: comments.length + 1,
+          username: user.username || "You",
+          text: newComment,
+        },
       ]);
       setNewComment("");
     }
   };
 
-  // Construct Firebase Storage URL
-  const constructFirebaseURL = (fileId) => {
-    const url = `${firebaseStorageBaseURL}${encodeURIComponent(
-      `user_post_upload/${post.author}/${fileId}`
-    )}?alt=media`;
-    return url;
-  };
-
   return (
-    <div className="max-w-sm sm:max-w-md lg:max-w-lg rounded-lg overflow-hidden shadow-lg border border-gray-800 ">
+    <div className="max-w-sm sm:max-w-md lg:max-w-lg rounded-lg overflow-hidden shadow-lg border border-gray-800">
       {/* User Info Header */}
       <div className="flex items-center p-4 border-b border-gray-200">
         <img
@@ -101,129 +144,135 @@ const PostCard = ({ post }) => {
           alt={`${author?.username || "User"}'s profile`}
         />
         <div className="ml-3 flex-grow">
-          <div className="flex items-center">
-            <p className="font-semibold text-lg mr-2">
-              {author?.username || "Username"}
-            </p>
-            <button className="bg-blue-500 text-white text-xs py-1 px-2 rounded">
-              Follow
-            </button>
-          </div>
+          <p className="font-semibold text-lg mr-2">
+            {author?.username || "Username"}
+          </p>
         </div>
       </div>
 
-      {images.length > 0 || videos.length > 0 ? (
-        <Carousel
-          showArrows={true}
-          infiniteLoop={true}
-          showThumbs={false} // Remove small image previews
-          className="carousel-wrapper"
-        >
-          {images.map((image, index) => (
-            <div key={index}>
+      {/* Post Media */}
+      <Carousel showArrows={true} infiniteLoop={true} showThumbs={false}>
+        {post.media.map((mediaItem, index) => (
+          <div key={index}>
+            {mediaItem.type === "image" ? (
               <img
-                className={`w-full ${
-                  isExpanded ? "max-h-96" : "max-h-48"
-                } object-cover transition-all duration-500`} // Add transition
-                src={constructFirebaseURL(image.file_id)}
+                className="w-full max-h-96 object-cover"
+                src={`https://firebasestorage.googleapis.com/v0/b/codeverse-3a59b.appspot.com/o/user_post_upload%2F${post.author}%2F${mediaItem.file_id}?alt=media`}
                 alt={post.caption}
               />
-            </div>
-          ))}
-          {videos.map((video, index) => (
-            <div key={index}>
+            ) : (
               <video
-                className={`w-full ${
-                  isExpanded ? "max-h-96" : "max-h-48"
-                } object-cover transition-all duration-500`} // Add transition
-                src={constructFirebaseURL(video.file_id)}
+                className="w-full max-h-96 object-cover"
                 controls
-                alt={post.caption}
+                src={`https://firebasestorage.googleapis.com/v0/b/codeverse-3a59b.appspot.com/o/user_post_upload%2F${post.author}%2F${mediaItem.file_id}?alt=media`}
               />
-            </div>
-          ))}
-        </Carousel>
-      ) : (
-        <p className="text-center py-4">No media available</p>
-      )}
+            )}
+          </div>
+        ))}
+      </Carousel>
 
+      {/* Caption and Description */}
       <div className="px-6 py-4">
         <div className="font-bold text-xl mb-2">{post.caption}</div>
-        <p
-          className={`text-gray-700 text-base ${
-            isExpanded ? "h-auto" : "h-24 overflow-hidden"
-          } transition-all duration-300`} // Add transition
-        >
-          {post.description}
-        </p>
+        <p className="text-gray-700 text-base">{post.description}</p>
         <button
           onClick={handleToggleExpand}
           className="text-blue-500 hover:underline mt-2"
         >
-          {isExpanded ? "Read More" : "Show Less"}
+          {isExpanded ? "Show Less" : "Show More"}
         </button>
       </div>
 
+      {/* Post Actions */}
       <div className="px-6 pt-4 pb-2 flex items-center justify-between">
-        <div className="flex space-x-8">
-          {" "}
-          {/* Increased spacing */}
-          <motion.div
-            whileTap={{ scale: 1.3, rotate: 360 }} // Increased scale and added rotate animation
-            className={`flex items-center cursor-pointer transition-transform duration-200 ${
-              liked ? "text-red-500" : "text-gray-500"
-            } text-2xl`} // Increased size
-            onClick={handleLike}
+        <div className="flex space-x-8 items-center">
+          <div
+            className={`flex items-center cursor-pointer text-2xl ${
+              liked ? "text-white bg-red-500" : "text-gray-500"
+            } p-2 rounded-full`}
+            onClick={handleLikeToggle}
           >
             <FaHeart />
-          </motion.div>
-          <motion.div
-            whileTap={{ scale: 1.3, rotate: 180 }} // Increased scale and added rotate animation
-            className="flex items-center cursor-pointer transition-transform duration-200 text-gray-500 text-2xl" // Increased size
-            onClick={handleShowComments}
+          </div>
+          <p
+            className="text-gray-500 cursor-pointer"
+            onClick={handleShowLikesModal}
           >
+            {likeCount} likes
+          </p>
+          <div className="flex items-center cursor-pointer text-gray-500 text-2xl">
             <FaComment />
-          </motion.div>
-          <motion.div
-            whileTap={{ scale: 1.3, rotate: 360 }} // Increased scale and added rotate animation
-            className={`flex items-center cursor-pointer transition-transform duration-200 ${
-              saved ? "text-blue-500" : "text-gray-500"
-            } text-2xl`} // Increased size
-            onClick={handleSave}
-          >
+          </div>
+          <div className="flex items-center cursor-pointer text-gray-500 text-2xl">
             <FaBookmark />
-          </motion.div>
+          </div>
         </div>
       </div>
 
-      {showComments && (
-        <div className="px-6 py-4 border-t border-gray-200">
-          <div className="space-y-2 mb-4">
-            {comments.map((comment) => (
-              <div key={comment.id} className="flex items-start space-x-2">
-                <p className="font-semibold">{comment.username}</p>
-                <p>{comment.text}</p>
-              </div>
-            ))}
-          </div>
-          <form onSubmit={handleCommentSubmit} className="flex items-center">
-            <input
-              type="text"
-              value={newComment}
-              onChange={handleCommentChange}
-              placeholder="Add a comment..."
-              className="flex-grow p-2 border border-gray-300 rounded-md
-              bg-gray-800 text-sm"
-            />
+      {/* Likes Modal */}
+      {showLikesModal && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 bg-gray-800 bg-opacity-70">
+          <div className="bg-gray-900 rounded-lg p-4 max-w-md w-full">
+            <h2 className="text-lg font-bold text-white mb-2">Liked by</h2>
+            <ul className="list-disc ml-4 text-gray-300">
+              {likes.slice(0, visibleLikesCount).map((like) => (
+                <li
+                  key={like.user?._id || like.user?.username}
+                  className="text-gray-300"
+                >
+                  {like.user ? like.user.username : "Unknown User"}
+                </li>
+              ))}
+            </ul>
+            {visibleLikesCount < likeCount && (
+              <button
+                onClick={handleShowMoreLikes}
+                className="m-4 bg-blue-500 text-white py-1 px-2 rounded"
+              >
+                Show More
+              </button>
+            )}
             <button
-              type="submit"
-              className="ml-2 bg-blue-500 text-white py-1 px-3 rounded text-sm"
+              onClick={handleCloseLikesModal}
+              className="mt-6 bg-gray-300 text-gray-700 py-1 px-4 rounded"
             >
-              Post
+              Close
             </button>
-          </form>
+          </div>
         </div>
       )}
+
+      {/* Comment Section */}
+      <form
+        onSubmit={handleCommentSubmit}
+        className="px-6 py-4 flex items-center"
+      >
+        <input
+          type="text"
+          value={newComment}
+          onChange={handleCommentChange}
+          placeholder="Add a comment..."
+          className="flex-grow p-2 border border-gray-300 rounded-md bg-gray-800 text-sm"
+        />
+        <button
+          type="submit"
+          className="ml-2 bg-blue-500 text-white py-1 px-3 rounded text-sm"
+        >
+          Post
+        </button>
+      </form>
+
+      {/* Display Comments */}
+      <div className="px-6 py-4">
+        {comments.map((comment) => (
+          <div key={comment.id} className="flex items-start space-x-2">
+            <span className="font-semibold text-gray-300">
+              {comment.username}:
+            </span>
+            <span className="text-gray-400">{comment.text}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
