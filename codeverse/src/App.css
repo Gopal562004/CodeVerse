@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+/* Add this to your main CSS file */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none; /* Safari and Chrome */
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+}
+.scrollable-container {
+  overflow: auto; /* Enable scrolling */
+  overflow-x: hidden; /* Hide horizontal scrollbar */
+  
+}
+
+.scrollable-container::-webkit-scrollbar {
+  display: none; /* For Chrome, Safari, and Opera */
+}
+/* Add this CSS to your styles */
+.hide-scrollbar {
+  overflow-y: scroll; /* Enable scrolling */
+  scrollbar-width: none; /* For Firefox */
+}
+
+/* For WebKit browsers like Chrome, Safari */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none; /* Hide scrollbar */
+}
