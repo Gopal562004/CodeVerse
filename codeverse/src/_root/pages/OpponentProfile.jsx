@@ -123,7 +123,7 @@ const handleProjectClick = async (projectId) => {
 };
 const createNotification = async (userId, message, type) => {
   try {
-    const response = await axios.post("http://localhost:5000/notifications", {
+    const response = await axios.post(`${BASE_URL}/notifications`, {
       userId,
       message,
       type,
