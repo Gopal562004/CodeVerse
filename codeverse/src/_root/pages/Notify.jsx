@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import axios from "axios";
 
 const iconTypes = {
@@ -7,8 +7,8 @@ const iconTypes = {
   follow: "👤",
 };
 
-const NotificationItem = ({ notification, onMarkAsRead, onDelete }) => {
-  return (
+const NotificationItem = React.memo(
+  ({ notification, onMarkAsRead, onDelete }) => (
     <div
       className={`flex items-center justify-between p-2 rounded-lg ${
         notification.isRead ? "bg-gray-900" : "bg-gray-800"
@@ -35,97 +35,109 @@ const NotificationItem = ({ notification, onMarkAsRead, onDelete }) => {
         </button>
       </div>
     </div>
-  );
-};
+  )
+);
 
 const Notify = () => {
+  const BASE_URL = import.meta.env.VITE_API_URL;
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const user = JSON.parse(localStorage.getItem("user"));
-  const userId = user?._id;
-  const lastNotificationRef = useRef();
+  const observerRef = useRef(null);
+  const lastNotificationRef = useRef(null);
+  const userId = JSON.parse(localStorage.getItem("user"))?._id;
 
-  useEffect(() => {
-    if (userId) {
-      fetchNotifications();
-      const intervalId = setInterval(fetchNotifications, 5000);
-      return () => clearInterval(intervalId);
-    }
-  }, [userId]);
-
-  const fetchNotifications = async () => {
-    if (loading) return;
+  const fetchNotifications = useCallback(async () => {
+    if (loading || !userId) return;
     setLoading(true);
+
     try {
-      const lastNotificationId =
-        notifications.length > 0 ? notifications[0]._id : "";
+      const lastId = notifications.length > 0 ? notifications[0]._id : "";
       const res = await axios.get(
-        `http://localhost:5000/notifications/${userId}?lastId=${lastNotificationId}`
+        `${BASE_URL}/notifications/${userId}?lastId=${lastId}`
       );
-      setNotifications((prev) => {
-        const newNotifications = res.data.filter(
-          (notif) => !prev.some((existing) => existing._id === notif._id)
-        );
-        return [...newNotifications, ...prev];
-      });
-      setHasMore(res.data.length > 0);
+
+      if (res.data.length > 0) {
+        setNotifications((prev) => {
+          const newNotifs = res.data.filter(
+            (n) => !prev.find((p) => p._id === n._id)
+          );
+          return [...newNotifs, ...prev];
+        });
+      } else {
+        setHasMore(false);
+      }
     } catch (err) {
       console.error("Error fetching notifications:", err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  };
+  }, [BASE_URL, userId, loading, notifications]);
 
-  const markAsRead = async (id) => {
-    try {
-      await axios.put(`http://localhost:5000/notifications/${id}/read`);
-      setNotifications((prev) =>
-        prev.map((notif) =>
-          notif._id === id ? { ...notif, isRead: true } : notif
-        )
-      );
-    } catch (err) {
-      console.error("Error marking notification as read:", err);
-    }
-  };
+  const markAsRead = useCallback(
+    async (id) => {
+      try {
+        await axios.put(`${BASE_URL}/notifications/${id}/read`);
+        setNotifications((prev) =>
+          prev.map((n) => (n._id === id ? { ...n, isRead: true } : n))
+        );
+      } catch (err) {
+        console.error("Error marking as read:", err);
+      }
+    },
+    [BASE_URL]
+  );
 
-  const deleteNotification = async (id) => {
-    try {
-      await axios.delete(`http://localhost:5000/notifications/${id}`);
-      setNotifications((prev) => prev.filter((notif) => notif._id !== id));
-    } catch (err) {
-      console.error("Error deleting notification:", err);
-    }
-  };
+  const deleteNotification = useCallback(
+    async (id) => {
+      try {
+        await axios.delete(`${BASE_URL}/notifications/${id}`);
+        setNotifications((prev) => prev.filter((n) => n._id !== id));
+      } catch (err) {
+        console.error("Error deleting notification:", err);
+      }
+    },
+    [BASE_URL]
+  );
 
   useEffect(() => {
-    const handleScroll = () => {
-      if (
-        lastNotificationRef.current &&
-        lastNotificationRef.current.getBoundingClientRect().top <=
-          window.innerHeight
-      ) {
-        if (hasMore && !loading) {
+    if (!hasMore || loading) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
           fetchNotifications();
         }
+      },
+      { threshold: 1 }
+    );
+
+    if (lastNotificationRef.current) {
+      observer.observe(lastNotificationRef.current);
+    }
+
+    return () => {
+      if (lastNotificationRef.current) {
+        observer.unobserve(lastNotificationRef.current);
       }
     };
+  }, [fetchNotifications, hasMore, loading]);
 
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [loading, hasMore]);
+  useEffect(() => {
+    if (userId) fetchNotifications();
+  }, [userId, fetchNotifications]);
 
   return (
-    <div className=" p-4 rounded-lg mt-4 w-full max-w-xs md:max-w-md mx-auto h-64 md:h-72">
+    <div className="p-4 rounded-lg mt-4 w-full max-w-xs md:max-w-md mx-auto h-64 md:h-72">
       <h2 className="text-lg font-semibold mb-2 text-center">Notifications</h2>
       <div className="overflow-y-auto h-52 md:h-60 space-y-2">
-        {notifications.length === 0 ? (
+        {notifications.length === 0 && !loading ? (
           <p className="text-gray-400 text-center">No new notifications</p>
         ) : (
-          notifications.map((notification) => (
+          notifications.map((notif) => (
             <NotificationItem
-              key={notification._id}
-              notification={notification}
+              key={notif._id}
+              notification={notif}
               onMarkAsRead={markAsRead}
               onDelete={deleteNotification}
             />

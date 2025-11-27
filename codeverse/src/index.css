@@ -35,3 +35,16 @@ body{
     opacity: 1;
   }
 }
+
+
+.backdrop-blur-xl {
+  backdrop-filter: blur(24px);
+}
+
+.shadow-blue-500\/25 {
+  box-shadow: 0 10px 30px -10px rgba(59, 130, 246, 0.25);
+}
+
+.hover\:scale-\[1\.02\]:hover {
+  transform: scale(1.02);
+}

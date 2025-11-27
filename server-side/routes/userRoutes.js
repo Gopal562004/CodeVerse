@@ -169,37 +169,101 @@ router.get("/user/:id", async (req, res) => {
 
 //////////////
 // Upload profile photo
+// router.post(
+//   "/upload-profile-photo",
+//   jwtAuthMiddleware, // Ensure JWT is verified and user ID is available in req.user
+//   upload.single("file"), // Assuming you're using multer or similar for file uploads
+//   async (req, res) => {
+//     try {
+//       // Check if the file was uploaded
+//       if (!req.file) {
+//         return res.status(400).json({ message: "No file uploaded" });
+//       }
+
+//       // Get user ID from the request context (after JWT verification)
+//       const userId = req.user.id; // Ensure this is set in your JWT payload
+
+//       // Fetch current user to check for existing profile photo
+//       const user = await User.findById(userId);
+//       console.log(
+//         "Current user profile photo:",
+//         user ? user.profilePhoto : "User not found"
+//       );
+
+//       // If a profile photo exists, delete it
+//       if (user && user.profilePhoto) {
+//         console.log("Attempting to delete existing photo...");
+//         try {
+//           await deleteFileFromFirebase(user.profilePhoto);
+//         } catch (deleteError) {
+//           if (deleteError.code === "storage/object-not-found") {
+//             console.warn("File does not exist, skipping deletion.");
+//           } else {
+//             console.error("Failed to delete existing photo:", deleteError);
+//             return res.status(500).json({
+//               message: "Failed to delete existing photo",
+//               error: deleteError.message,
+//             });
+//           }
+//         }
+//       }
+
+//       // Upload the new file to Firebase and get the download URL
+//       const { downloadURL } = await uploadFileToFirebaseProfile(
+//         req.file,
+//         userId
+//       );
+//       console.log("Uploaded new profile photo URL:", downloadURL);
+
+//       // Update user's profile with the new photo URL and original file name
+//       const updatedUser = await User.findByIdAndUpdate(
+//         userId,
+//         {
+//           profilePhoto: req.file.originalname, // Save the uploaded file URL
+//         },
+//         { new: true, upsert: true } // Use upsert to create the field if it doesn't exist
+//       );
+
+//       // Respond with the file URL
+//       return res.status(200).json({
+//         message: "Profile photo uploaded successfully",
+//         fileUrl: downloadURL,
+//       });
+//     } catch (error) {
+//       console.error("Upload error:", error);
+//       return res.status(500).json({
+//         message: "Error uploading file",
+//         error: error.message || error,
+//       });
+//     }
+//   }
+// );
 router.post(
   "/upload-profile-photo",
-  jwtAuthMiddleware, // Ensure JWT is verified and user ID is available in req.user
-  upload.single("file"), // Assuming you're using multer or similar for file uploads
+  jwtAuthMiddleware,
+  upload.single("file"),
   async (req, res) => {
     try {
-      // Check if the file was uploaded
       if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
       }
 
-      // Get user ID from the request context (after JWT verification)
-      const userId = req.user.id; // Ensure this is set in your JWT payload
+      const userId = req.user.id;
 
-      // Fetch current user to check for existing profile photo
       const user = await User.findById(userId);
-      console.log(
-        "Current user profile photo:",
-        user ? user.profilePhoto : "User not found"
-      );
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
 
-      // If a profile photo exists, delete it
-      if (user && user.profilePhoto) {
-        console.log("Attempting to delete existing photo...");
+      // Delete previous photo from Firebase if it exists
+      if (user.profilePhoto) {
         try {
           await deleteFileFromFirebase(user.profilePhoto);
         } catch (deleteError) {
           if (deleteError.code === "storage/object-not-found") {
-            console.warn("File does not exist, skipping deletion.");
+            console.warn("Old photo not found in Firebase.");
           } else {
-            console.error("Failed to delete existing photo:", deleteError);
+            console.error("Error deleting old photo:", deleteError);
             return res.status(500).json({
               message: "Failed to delete existing photo",
               error: deleteError.message,
@@ -208,26 +272,24 @@ router.post(
         }
       }
 
-      // Upload the new file to Firebase and get the download URL
+      // Upload new file to Firebase and get download URL
       const { downloadURL } = await uploadFileToFirebaseProfile(
         req.file,
         userId
       );
-      console.log("Uploaded new profile photo URL:", downloadURL);
+      console.log("New profile photo URL:", downloadURL);
 
-      // Update user's profile with the new photo URL and original file name
+      // Save the downloadURL in the user profile
       const updatedUser = await User.findByIdAndUpdate(
         userId,
-        {
-          profilePhoto: req.file.originalname, // Save the uploaded file URL
-        },
-        { new: true, upsert: true } // Use upsert to create the field if it doesn't exist
+        { profilePhoto: downloadURL },
+        { new: true }
       );
 
-      // Respond with the file URL
       return res.status(200).json({
         message: "Profile photo uploaded successfully",
         fileUrl: downloadURL,
+        user: updatedUser,
       });
     } catch (error) {
       console.error("Upload error:", error);
@@ -238,6 +300,7 @@ router.post(
     }
   }
 );
+
 router.get("/user-id", jwtAuthMiddleware, async (req, res) => {
   try {
     const userId = req.user.id; // Extract user ID from the JWT payload

@@ -28,3 +28,66 @@
 .hide-scrollbar::-webkit-scrollbar {
   display: none; /* Hide scrollbar */
 }
+
+
+/* Add these styles to your global CSS file */
+
+/* Smooth transitions for all elements */
+* {
+  transition: all 0.3s ease-in-out;
+}
+
+/* Custom scrollbar for modern browsers */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0D0D0D;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(to bottom, #3B82F6, #8B5CF6);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(to bottom, #8B5CF6, #3B82F6);
+}
+
+/* Glassmorphism utility classes */
+.glass-effect {
+  background: rgba(26, 26, 26, 0.7);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Neumorphism shadows */
+.neumorphism-dark {
+  box-shadow: 
+    8px 8px 16px #0a0a0a,
+    -8px -8px 16px #1a1a1a;
+}
+
+.neumorphism-inset {
+  box-shadow: 
+    inset 3px 3px 6px #0a0a0a,
+    inset -3px -3px 6px #1a1a1a;
+}
+
+/* Gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, #3B82F6, #8B5CF6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Glowing effects */
+.glow-blue {
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+}
+
+.glow-purple {
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+}
