@@ -127,7 +127,7 @@ const corsOptions = {
     const allowedOrigins = [
       "http://localhost:5173",
       "http://localhost:5174",
-      "https://your-production-domain.com", // Add your production domain
+      "https://code-verse-phi.vercel.app/", // Add your production domain
     ];
 
     if (allowedOrigins.indexOf(origin) !== -1) {
